@@ -35,15 +35,20 @@ async def run_agent(
     prompt: str,
     max_tokens: int | None = None,
     reasoning_effort: str | None = None,
+    extra_system_prompt: str | None = None,
 ) -> str:
     try:
         reasoning = build_reasoning_param(reasoning_effort)
     except ValueError as e:
         raise AgentError(str(e)) from e
 
+    system_prompt = AGENT_SYSTEM_PROMPT
+    if extra_system_prompt:
+        system_prompt = f"{system_prompt}\n\n{extra_system_prompt}"
+
     tools = schemas_for_tier(tier)
     messages: list[dict] = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": redact(prompt)},
     ]
 

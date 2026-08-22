@@ -56,7 +56,15 @@ def test_build_server_exits_on_invalid_timeout(monkeypatch, tmp_path):
 async def test_registers_one_tool_per_model_plus_list_models(server):
     tools = await server.list_tools()
     names = {t.name for t in tools}
-    assert names == {"ask_foo", "list_models", "spend_status"}
+    assert names == {
+        "ask_foo",
+        "list_models",
+        "spend_status",
+        "save_profile",
+        "list_profiles",
+        "ask_profile",
+        "agent_profile",
+    }
 
 
 async def test_list_models_reports_catalogue(server):
@@ -180,3 +188,122 @@ async def test_ask_tool_refuses_once_budget_exhausted(monkeypatch, tmp_path):
     result = await server.call_tool("ask_foo", {"prompt": "again"})
     assert "budget" in result[0].text
     assert route.call_count == 1  # second call was refused before hitting the network
+
+
+@pytest.fixture
+def profiles_path(monkeypatch, tmp_path):
+    path = tmp_path / "profiles.toml"
+    monkeypatch.setenv("CONCLAVE_PROFILES_PATH", str(path))
+    return path
+
+
+async def test_save_profile_rejects_unknown_base_alias(server, profiles_path):
+    result = await server.call_tool(
+        "save_profile",
+        {"name": "reviewer", "base_alias": "nonexistent", "system_prompt": "Be strict."},
+    )
+    assert "unknown base_alias" in result[0].text
+
+
+async def test_save_profile_rejects_bad_reasoning_effort(server, profiles_path):
+    result = await server.call_tool(
+        "save_profile",
+        {
+            "name": "reviewer",
+            "base_alias": "foo",
+            "system_prompt": "Be strict.",
+            "reasoning_effort": "ultra",
+        },
+    )
+    assert "reasoning_effort must be one of" in result[0].text
+
+
+async def test_save_profile_rejects_bad_agent_tools(server, profiles_path):
+    result = await server.call_tool(
+        "save_profile",
+        {
+            "name": "reviewer",
+            "base_alias": "foo",
+            "system_prompt": "Be strict.",
+            "agent_tools": "godmode",
+        },
+    )
+    assert "agent_tools must be one of" in result[0].text
+
+
+async def test_save_profile_succeeds_and_list_profiles_reports_it(server, profiles_path):
+    save_result = await server.call_tool(
+        "save_profile",
+        {"name": "reviewer", "base_alias": "foo", "system_prompt": "Be strict."},
+    )
+    assert "saved profile 'reviewer'" in save_result[0].text
+
+    list_result = await server.call_tool("list_profiles", {})
+    assert "reviewer" in list_result[0].text
+    assert "foo" in list_result[0].text
+
+
+async def test_list_profiles_reports_none_saved_yet(server, profiles_path):
+    result = await server.call_tool("list_profiles", {})
+    assert "No profiles saved yet" in result[0].text
+
+
+async def test_ask_profile_rejects_unknown_profile(server, profiles_path):
+    result = await server.call_tool("ask_profile", {"name": "ghost", "prompt": "hi"})
+    assert "unknown profile" in result[0].text
+
+
+@respx.mock
+async def test_ask_profile_uses_saved_persona(server, profiles_path):
+    await server.call_tool(
+        "save_profile",
+        {"name": "reviewer", "base_alias": "foo", "system_prompt": "Be strict."},
+    )
+    route = respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"role": "assistant", "content": "reviewed"}}]}
+        )
+    )
+
+    result = await server.call_tool("ask_profile", {"name": "reviewer", "prompt": "check this"})
+
+    assert "reviewed" in result[0].text
+    sent = route.calls[0].request.content.decode()
+    assert "Be strict." in sent
+
+
+async def test_agent_profile_errors_without_any_tier(server, profiles_path, tmp_path):
+    await server.call_tool(
+        "save_profile",
+        {"name": "reviewer", "base_alias": "foo", "system_prompt": "Be strict."},
+    )
+
+    result = await server.call_tool(
+        "agent_profile", {"name": "reviewer", "prompt": "hi", "workspace": str(tmp_path)}
+    )
+
+    assert "has no agent_tools tier" in result[0].text
+
+
+@respx.mock
+async def test_agent_profile_uses_own_tier_override(server, profiles_path, tmp_path):
+    await server.call_tool(
+        "save_profile",
+        {
+            "name": "reviewer",
+            "base_alias": "foo",
+            "system_prompt": "Be strict.",
+            "agent_tools": "read",
+        },
+    )
+    respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"role": "assistant", "content": "reviewed"}}]}
+        )
+    )
+
+    result = await server.call_tool(
+        "agent_profile", {"name": "reviewer", "prompt": "hi", "workspace": str(tmp_path)}
+    )
+
+    assert "reviewed" in result[0].text

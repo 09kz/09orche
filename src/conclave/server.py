@@ -9,7 +9,11 @@ from mcp.server.fastmcp import FastMCP
 from conclave import cost
 from conclave.agent import AgentError, run_agent
 from conclave.client import OpenRouterError, ask
-from conclave.config import load_models_or_exit
+from conclave.config import AGENT_TIERS, ConfigError, load_models_or_exit, validate_alias_name
+from conclave.profiles import Profile
+from conclave.profiles import load_profiles as _load_profiles
+from conclave.profiles import save_profile as _save_profile
+from conclave.reasoning import VALID_EFFORTS
 
 DEFAULT_SYSTEM_PROMPT = "You are a helpful expert assistant."
 
@@ -112,6 +116,123 @@ def build_server() -> FastMCP:
     async def spend_status() -> str:
         """Report this session's cumulative OpenRouter spend and budget, if any."""
         return cost.status()
+
+    @mcp.tool()
+    async def save_profile(
+        name: str,
+        base_alias: str,
+        system_prompt: str,
+        reasoning_effort: str | None = None,
+        agent_tools: str | None = None,
+    ) -> str:
+        """Create or update a named subagent profile: a fixed persona on top of
+        an existing model alias, reusable across calls without restating it.
+        `base_alias` must be one of the aliases from `list_models`."""
+        try:
+            validate_alias_name(name)
+        except ConfigError as e:
+            return f"conclave: {e}"
+        if base_alias not in catalogue:
+            return f"conclave: unknown base_alias {base_alias!r}, see list_models"
+        if reasoning_effort is not None and reasoning_effort not in VALID_EFFORTS:
+            return f"conclave: reasoning_effort must be one of {VALID_EFFORTS}"
+        if agent_tools is not None and agent_tools not in AGENT_TIERS:
+            return f"conclave: agent_tools must be one of {AGENT_TIERS}"
+
+        profile = Profile(
+            name=name,
+            base_alias=base_alias,
+            system_prompt=system_prompt.strip(),
+            reasoning_effort=reasoning_effort,
+            agent_tools=agent_tools,
+        )
+        try:
+            _save_profile(profile)
+        except ConfigError as e:
+            return f"conclave: {e}"
+        return f"saved profile {name!r} (base: {base_alias})"
+
+    @mcp.tool()
+    async def list_profiles() -> str:
+        """List saved subagent profiles, with their base model and overrides."""
+        try:
+            profiles = _load_profiles()
+        except ConfigError as e:
+            return f"conclave: {e}"
+        if not profiles:
+            return "No profiles saved yet. Create one with save_profile."
+        lines = []
+        for p in profiles.values():
+            effort = f" [reasoning: {p.reasoning_effort}]" if p.reasoning_effort else ""
+            agent = f" [agent: {p.agent_tools}]" if p.agent_tools else ""
+            lines.append(f"{p.name:<20} base: {p.base_alias}{effort}{agent}")
+        return "Saved profiles:\n" + "\n".join(lines)
+
+    def _resolve_profile(name: str) -> Profile | str:
+        """Return the Profile, or an error string if it (or its base) is invalid."""
+        try:
+            profiles = _load_profiles()
+        except ConfigError as e:
+            return f"conclave: {e}"
+        profile = profiles.get(name)
+        if profile is None:
+            return f"conclave: unknown profile {name!r}, see list_profiles"
+        if profile.base_alias not in catalogue:
+            return (
+                f"conclave: profile {name!r} references base_alias "
+                f"{profile.base_alias!r}, which is no longer in the catalogue"
+            )
+        return profile
+
+    @mcp.tool()
+    async def ask_profile(name: str, prompt: str) -> str:
+        """Call a saved profile's base model with its saved persona."""
+        profile = _resolve_profile(name)
+        if isinstance(profile, str):
+            return profile
+        spec = catalogue[profile.base_alias]
+        try:
+            return await ask(
+                api_key,
+                spec,
+                catalogue,
+                prompt,
+                profile.system_prompt,
+                reasoning_effort=profile.reasoning_effort,
+            )
+        except OpenRouterError as e:
+            return f"conclave: {e}"
+
+    @mcp.tool()
+    async def agent_profile(name: str, prompt: str, workspace: str) -> str:
+        """Run a saved profile in agent mode against a workspace directory."""
+        profile = _resolve_profile(name)
+        if isinstance(profile, str):
+            return profile
+        spec = catalogue[profile.base_alias]
+        tier = profile.agent_tools or spec.agent_tools
+        if tier is None:
+            return (
+                f"conclave: profile {name!r} has no agent_tools tier, and neither "
+                f"does its base model {profile.base_alias!r} — set one on the "
+                "profile (save_profile) or the base model (models.toml)"
+            )
+        ws_path = Path(workspace).resolve()
+        if not ws_path.is_dir():
+            return f"conclave: workspace is not a directory: {workspace}"
+        try:
+            return await run_agent(
+                api_key,
+                spec.id,
+                tier,
+                ws_path,
+                prompt,
+                spec.max_tokens,
+                profile.reasoning_effort,
+                profile.system_prompt,
+            )
+        except AgentError as e:
+            return f"conclave: {e}"
 
     return mcp
 

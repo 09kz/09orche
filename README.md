@@ -72,6 +72,33 @@ each model having its own incompatible way to ask for more or less of it.
 which exposes the same OpenRouter feature under this friendlier name — credit
 where due.)
 
+## Profiles
+
+A profile is a named, reusable persona on top of an existing model alias —
+create it once, call it by name instead of restating a system prompt every
+time:
+
+```
+save_profile(name="reviewer", base_alias="ox_alpha",
+             system_prompt="You are a terse code reviewer. Flag only real bugs.",
+             agent_tools="read")   # optional: gives the profile its own agent tier
+
+ask_profile("reviewer", prompt="...")
+agent_profile("reviewer", prompt="...", workspace="/path/to/project")
+```
+
+`list_profiles` shows what's saved. Profiles live in `profiles.toml`
+(resolved the same way as `CONCLAVE_MODELS_PATH`: `CONCLAVE_PROFILES_PATH` env
+var, else `./profiles.toml`) — a missing file just means none exist yet.
+`agent_tools` on a profile overrides its base model's tier for that profile
+only; if neither the profile nor the base model has one set, `agent_profile`
+returns a clear error instead of a traceback.
+
+For guidance on *when* a profile is worth creating, and how to verify
+subagent output without a rigid mandatory pipeline, see the
+[subagent-orchestration skill](skills/subagent-orchestration/SKILL.md) —
+install it by copying that directory into your own `~/.claude/skills/`.
+
 ## Configuring your own models
 
 The bundled catalogue lives in `models.toml`. Override it by placing your own

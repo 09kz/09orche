@@ -60,7 +60,7 @@ def _load_raw(path: Path | None) -> dict:
         raise ConfigError(f"invalid TOML in {source}: {e}") from e
 
 
-def _validate_alias(alias: str) -> None:
+def validate_alias_name(alias: str) -> None:
     if not alias or not alias.replace("_", "a").isalnum() or not alias[0].isalpha():
         raise ConfigError(ALIAS_RE_MSG.format(alias=alias))
     if not alias.islower():
@@ -90,7 +90,7 @@ def load_models(path: Path | None = None) -> dict[str, ModelSpec]:
 
     specs: dict[str, ModelSpec] = {}
     for alias, entry in models_section.items():
-        _validate_alias(alias)
+        validate_alias_name(alias)
         if not isinstance(entry, dict):
             raise ConfigError(f"models.{alias} must be a table")
         if "id" not in entry or not isinstance(entry["id"], str):

@@ -86,6 +86,22 @@ async def test_agent_tool_result_is_fed_back_to_model(workspace):
 
 
 @respx.mock
+async def test_agent_appends_extra_system_prompt(workspace):
+    route = respx.post(CHAT_URL).mock(return_value=final_answer("ok"))
+
+    await run_agent(
+        "key", "acme/model", "read", workspace, "hi",
+        extra_system_prompt="You are a strict code reviewer.",
+    )
+
+    sent = json.loads(route.calls[0].request.content)
+    system_message = sent["messages"][0]
+    assert system_message["role"] == "system"
+    assert "sandboxed workspace" in system_message["content"]  # base prompt kept
+    assert "strict code reviewer" in system_message["content"]  # persona appended
+
+
+@respx.mock
 async def test_agent_stops_at_iteration_limit(workspace):
     respx.post(CHAT_URL).mock(
         return_value=tool_call_response("list_dir", {"path": "."})
