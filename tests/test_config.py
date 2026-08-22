@@ -1,0 +1,111 @@
+import pytest
+
+from conclave.config import ConfigError, load_models
+
+
+def write(tmp_path, text):
+    path = tmp_path / "models.toml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_loads_bundled_default():
+    models = load_models()
+    assert "ox_alpha" in models
+    assert models["ox_alpha"].id == "stealth/ox-alpha"
+
+
+def test_loads_valid_custom_file(tmp_path):
+    path = write(
+        tmp_path,
+        """
+        [models.foo]
+        id = "acme/foo"
+        description = "A foo model."
+        """,
+    )
+    models = load_models(path)
+    assert models["foo"].id == "acme/foo"
+    assert models["foo"].fallback is None
+
+
+def test_fallback_resolves(tmp_path):
+    path = write(
+        tmp_path,
+        """
+        [models.foo]
+        id = "acme/foo"
+        description = "Foo."
+        fallback = "bar"
+
+        [models.bar]
+        id = "acme/bar"
+        description = "Bar."
+        """,
+    )
+    models = load_models(path)
+    assert models["foo"].fallback == "bar"
+
+
+def test_missing_file_raises(tmp_path):
+    with pytest.raises(ConfigError, match="could not read"):
+        load_models(tmp_path / "does-not-exist.toml")
+
+
+def test_no_models_section_raises(tmp_path):
+    path = write(tmp_path, "title = \"empty\"\n")
+    with pytest.raises(ConfigError, match="no \\[models\\.\\*\\] entries"):
+        load_models(path)
+
+
+def test_missing_id_raises(tmp_path):
+    path = write(tmp_path, '[models.foo]\ndescription = "no id"\n')
+    with pytest.raises(ConfigError, match="missing a string 'id'"):
+        load_models(path)
+
+
+def test_missing_description_raises(tmp_path):
+    path = write(tmp_path, '[models.foo]\nid = "acme/foo"\n')
+    with pytest.raises(ConfigError, match="missing a string 'description'"):
+        load_models(path)
+
+
+def test_unresolved_fallback_raises(tmp_path):
+    path = write(
+        tmp_path,
+        """
+        [models.foo]
+        id = "acme/foo"
+        description = "Foo."
+        fallback = "ghost"
+        """,
+    )
+    with pytest.raises(ConfigError, match="unknown alias"):
+        load_models(path)
+
+
+def test_self_fallback_raises(tmp_path):
+    path = write(
+        tmp_path,
+        """
+        [models.foo]
+        id = "acme/foo"
+        description = "Foo."
+        fallback = "foo"
+        """,
+    )
+    with pytest.raises(ConfigError, match="cannot reference itself"):
+        load_models(path)
+
+
+def test_invalid_alias_raises(tmp_path):
+    path = write(tmp_path, '[models."Not Valid"]\nid = "acme/x"\ndescription = "x"\n')
+    with pytest.raises(ConfigError, match="aliases must match"):
+        load_models(path)
+
+
+def test_env_var_overrides_cwd(tmp_path, monkeypatch):
+    real = write(tmp_path, '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\n')
+    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(real))
+    models = load_models()
+    assert set(models) == {"foo"}
