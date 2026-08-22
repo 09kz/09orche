@@ -104,6 +104,48 @@ def test_invalid_alias_raises(tmp_path):
         load_models(path)
 
 
+def test_max_tokens_parsed(tmp_path):
+    path = write(
+        tmp_path,
+        '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\nmax_tokens = 4000\n',
+    )
+    models = load_models(path)
+    assert models["foo"].max_tokens == 4000
+
+
+def test_max_tokens_must_be_positive_int(tmp_path):
+    path = write(
+        tmp_path,
+        '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\nmax_tokens = -1\n',
+    )
+    with pytest.raises(ConfigError, match="positive integer"):
+        load_models(path)
+
+
+def test_agent_tools_parsed(tmp_path):
+    path = write(
+        tmp_path,
+        '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\nagent_tools = "full"\n',
+    )
+    models = load_models(path)
+    assert models["foo"].agent_tools == "full"
+
+
+def test_agent_tools_defaults_to_none(tmp_path):
+    path = write(tmp_path, '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\n')
+    models = load_models(path)
+    assert models["foo"].agent_tools is None
+
+
+def test_agent_tools_rejects_unknown_tier(tmp_path):
+    path = write(
+        tmp_path,
+        '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\nagent_tools = "godmode"\n',
+    )
+    with pytest.raises(ConfigError, match="agent_tools must be one of"):
+        load_models(path)
+
+
 def test_env_var_overrides_cwd(tmp_path, monkeypatch):
     real = write(tmp_path, '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\n')
     monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(real))

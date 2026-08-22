@@ -15,13 +15,23 @@ RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 MAX_RETRIES = 3
 BASE_DELAY = 1.5
 
+# Applied when a model's `max_tokens` isn't set in models.toml. Without an
+# explicit value, some OpenRouter routes fall back to a provider-specific
+# default that can be surprisingly small — always send something explicit.
+DEFAULT_MAX_TOKENS = 8000
+
 
 class OpenRouterError(Exception):
     """A non-retryable or exhausted-retry failure from OpenRouter."""
 
 
 async def _post_once(
-    client: httpx.AsyncClient, api_key: str, model_id: str, prompt: str, system_prompt: str
+    client: httpx.AsyncClient,
+    api_key: str,
+    model_id: str,
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int,
 ) -> httpx.Response:
     return await client.post(
         f"{BASE_URL}/chat/completions",
@@ -32,6 +42,7 @@ async def _post_once(
         },
         json={
             "model": model_id,
+            "max_tokens": max_tokens,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
@@ -49,13 +60,15 @@ def _extract_text(body: dict) -> str:
     return text
 
 
-async def _call_with_retry(api_key: str, model_id: str, prompt: str, system_prompt: str) -> str:
+async def _call_with_retry(
+    api_key: str, model_id: str, prompt: str, system_prompt: str, max_tokens: int
+) -> str:
     last_error: str | None = None
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         for attempt in range(MAX_RETRIES + 1):
             try:
-                r = await _post_once(client, api_key, model_id, prompt, system_prompt)
+                r = await _post_once(client, api_key, model_id, prompt, system_prompt, max_tokens)
             except httpx.TransportError as e:
                 last_error = f"network error calling {model_id}: {e}"
                 if attempt == MAX_RETRIES:
@@ -98,8 +111,9 @@ async def ask(
     _visited: frozenset[str] = frozenset(),
 ) -> str:
     """Call `spec`'s model; on exhausted retries, fall through to its fallback if set."""
+    max_tokens = spec.max_tokens or DEFAULT_MAX_TOKENS
     try:
-        return await _call_with_retry(api_key, spec.id, prompt, system_prompt)
+        return await _call_with_retry(api_key, spec.id, prompt, system_prompt, max_tokens)
     except OpenRouterError as e:
         if spec.fallback is None or spec.fallback in _visited:
             raise

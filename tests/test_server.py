@@ -59,3 +59,48 @@ async def test_ask_tool_calls_openrouter_and_returns_text(server):
     result = await server.call_tool("ask_foo", {"prompt": "what is the answer?"})
     text = result[0].text
     assert "42" in text
+
+
+@pytest.fixture
+def agent_server(monkeypatch, tmp_path):
+    models_path = tmp_path / "models.toml"
+    models_path.write_text(
+        '[models.foo]\nid = "acme/foo"\ndescription = "A test model."\nagent_tools = "read"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    return build_server()
+
+
+async def test_agent_tool_registered_only_when_configured(agent_server):
+    tools = await agent_server.list_tools()
+    names = {t.name for t in tools}
+    assert "agent_foo" in names
+
+
+async def test_no_agent_tool_when_not_configured(server):
+    tools = await server.list_tools()
+    names = {t.name for t in tools}
+    assert "agent_foo" not in names
+
+
+async def test_agent_tool_rejects_missing_workspace(agent_server, tmp_path):
+    result = await agent_server.call_tool(
+        "agent_foo", {"prompt": "hi", "workspace": str(tmp_path / "does-not-exist")}
+    )
+    assert "not a directory" in result[0].text
+
+
+@respx.mock
+async def test_agent_tool_runs_agent_loop(agent_server, tmp_path):
+    respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"role": "assistant", "content": "all good"}}]}
+        )
+    )
+
+    result = await agent_server.call_tool(
+        "agent_foo", {"prompt": "look around", "workspace": str(tmp_path)}
+    )
+    assert "all good" in result[0].text

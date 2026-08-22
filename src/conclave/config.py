@@ -10,6 +10,7 @@ from importlib import resources
 from pathlib import Path
 
 ALIAS_RE_MSG = "aliases must match [a-z][a-z0-9_]* (got {alias!r})"
+AGENT_TIERS = ("read", "read_write", "full")
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,8 @@ class ModelSpec:
     id: str
     description: str
     fallback: str | None = None
+    max_tokens: int | None = None
+    agent_tools: str | None = None  # one of AGENT_TIERS, or None = agent mode off
 
 
 class ConfigError(Exception):
@@ -92,11 +95,24 @@ def load_models(path: Path | None = None) -> dict[str, ModelSpec]:
         fallback = entry.get("fallback")
         if fallback is not None and not isinstance(fallback, str):
             raise ConfigError(f"models.{alias}.fallback must be a string alias")
+
+        max_tokens = entry.get("max_tokens")
+        if max_tokens is not None and (not isinstance(max_tokens, int) or max_tokens <= 0):
+            raise ConfigError(f"models.{alias}.max_tokens must be a positive integer")
+
+        agent_tools = entry.get("agent_tools")
+        if agent_tools is not None and agent_tools not in AGENT_TIERS:
+            raise ConfigError(
+                f"models.{alias}.agent_tools must be one of {AGENT_TIERS} (got {agent_tools!r})"
+            )
+
         specs[alias] = ModelSpec(
             alias=alias,
             id=entry["id"],
             description=entry["description"].strip(),
             fallback=fallback,
+            max_tokens=max_tokens,
+            agent_tools=agent_tools,
         )
 
     for spec in specs.values():

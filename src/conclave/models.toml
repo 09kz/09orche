@@ -8,6 +8,18 @@
 # the primary model returns a 429 (rate limited) after exhausting retries.
 # Useful for free-tier models, which share upstream capacity.
 #
+# `max_tokens` (optional) caps the model's output length. Always set
+# explicitly — without it, some OpenRouter routes fall back to a
+# provider-specific default that can be surprisingly small.
+#
+# `agent_tools` (optional: "read" | "read_write" | "full") turns on a second
+# tool, `agent_<alias>`, that gives the model sandboxed file/shell access
+# scoped to one workspace directory per call — see README for what each tier
+# permits. Left unset here deliberately: this file ships to anyone who
+# installs Conclave, and handing an external model shell access by default
+# is not a safe out-of-the-box choice. Enable it in your own override file
+# (CONCLAVE_MODELS_PATH) if you want it.
+#
 # Override this file by pointing CONCLAVE_MODELS_PATH at your own copy,
 # or by placing a models.toml in your current working directory.
 
@@ -18,6 +30,7 @@ Ox Alpha — OpenRouter's flagship stealth model. 1M context, multimodal \
 (text/image/video), strong reasoning. Good default for hard problems.
 """
 fallback = "nemotron_lightning"
+max_tokens = 8000
 
 [models.nemotron_ultra]
 id = "nvidia/nemotron-3-ultra-550b-a55b:free"
@@ -26,6 +39,7 @@ NVIDIA Nemotron 3 Ultra 550B — the largest model in this set, 1M context, \
 deep reasoning. Use for analysis that needs real depth.
 """
 fallback = "nemotron_lightning"
+max_tokens = 8000
 
 [models.nemotron_lightning]
 id = "nvidia/nemotron-3.5-lightning:free"
@@ -33,20 +47,24 @@ description = """
 NVIDIA Nemotron 3.5 Lightning — 1M context, tuned for speed. Good for bulk \
 or simple tasks, and as a fallback for other models.
 """
+max_tokens = 8000
 
 [models.glm]
 id = "z-ai/glm-5.2:free"
 description = "Z.ai GLM 5.2 — 256k context. Strong general-purpose and coding model."
 fallback = "north_code"
+max_tokens = 8000
 
 [models.north_code]
 id = "cohere/north-mini-code:free"
 description = "Cohere North Mini Code — 256k context, specialized for code."
+max_tokens = 8000
 
 [models.laguna]
 id = "poolside/laguna-s-2.1:free"
 description = "Poolside Laguna S 2.1 — 262k context, built for software engineering tasks."
 fallback = "north_code"
+max_tokens = 8000
 
 [models.dots_note]
 id = "dots-studio/dots-3-note-preview:free"
@@ -54,3 +72,4 @@ description = """
 Dots3 Note Preview — 512k context, text and image. Good for working through \
 long documents.
 """
+max_tokens = 16000
