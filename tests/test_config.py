@@ -146,6 +146,47 @@ def test_agent_tools_rejects_unknown_tier(tmp_path):
         load_models(path)
 
 
+def test_agent_mode_flag_applies_to_all_models(tmp_path, monkeypatch):
+    path = write(
+        tmp_path,
+        """
+        [models.foo]
+        id = "acme/foo"
+        description = "Foo."
+
+        [models.bar]
+        id = "acme/bar"
+        description = "Bar."
+        """,
+    )
+    monkeypatch.setenv("CONCLAVE_AGENT_MODE", "full")
+    models = load_models(path)
+    assert models["foo"].agent_tools == "full"
+    assert models["bar"].agent_tools == "full"
+
+
+def test_agent_mode_flag_does_not_override_explicit_per_model_setting(tmp_path, monkeypatch):
+    path = write(
+        tmp_path,
+        """
+        [models.foo]
+        id = "acme/foo"
+        description = "Foo."
+        agent_tools = "read"
+        """,
+    )
+    monkeypatch.setenv("CONCLAVE_AGENT_MODE", "full")
+    models = load_models(path)
+    assert models["foo"].agent_tools == "read"
+
+
+def test_agent_mode_flag_rejects_invalid_tier(tmp_path, monkeypatch):
+    path = write(tmp_path, '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\n')
+    monkeypatch.setenv("CONCLAVE_AGENT_MODE", "godmode")
+    with pytest.raises(ConfigError, match="CONCLAVE_AGENT_MODE must be one of"):
+        load_models(path)
+
+
 def test_env_var_overrides_cwd(tmp_path, monkeypatch):
     real = write(tmp_path, '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\n')
     monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(real))

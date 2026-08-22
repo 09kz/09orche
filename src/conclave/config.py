@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import resources
 from pathlib import Path
 
@@ -74,6 +74,11 @@ def load_models(path: Path | None = None) -> dict[str, ModelSpec]:
     1. `CONCLAVE_MODELS_PATH` env var
     2. `./models.toml` in the current working directory
     3. the catalogue bundled with the package
+
+    If `CONCLAVE_AGENT_MODE` is set (to "read", "read_write", or "full"), it
+    turns on agent mode at that tier for every model that doesn't already set
+    its own `agent_tools` — a one-variable way to make the whole catalogue
+    agent-capable without editing models.toml.
     """
     resolved = path if path is not None else _find_config_path()
     raw = _load_raw(resolved)
@@ -123,7 +128,26 @@ def load_models(path: Path | None = None) -> dict[str, ModelSpec]:
         if spec.fallback == spec.alias:
             raise ConfigError(f"models.{spec.alias}.fallback cannot reference itself")
 
+    specs = _apply_agent_mode_override(specs)
     return specs
+
+
+def _apply_agent_mode_override(specs: dict[str, ModelSpec]) -> dict[str, ModelSpec]:
+    """CONCLAVE_AGENT_MODE, if set, turns on agent mode at that tier for every
+    model that doesn't already set its own `agent_tools` in models.toml. A
+    per-model setting always wins over the blanket flag.
+    """
+    override = os.environ.get("CONCLAVE_AGENT_MODE")
+    if override is None:
+        return specs
+    if override not in AGENT_TIERS:
+        raise ConfigError(
+            f"CONCLAVE_AGENT_MODE must be one of {AGENT_TIERS} (got {override!r})"
+        )
+    return {
+        alias: spec if spec.agent_tools is not None else replace(spec, agent_tools=override)
+        for alias, spec in specs.items()
+    }
 
 
 def load_models_or_exit() -> dict[str, ModelSpec]:

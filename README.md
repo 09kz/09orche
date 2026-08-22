@@ -34,6 +34,10 @@ claude mcp add conclave -s user \
   -- uvx conclave-mcp
 ```
 
+Add `-e "CONCLAVE_AGENT_MODE=full"` to that same command if you want every
+model to come up with full agent tools (file access + shell) from the start
+— see [Agent mode](#agent-mode) before you do.
+
 Get a key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys).
 The bundled model catalogue is entirely free-tier — no OpenRouter spend required
 to use it as shipped.
@@ -117,13 +121,26 @@ gets a clean refusal, not a security hole.
 
 **This hands a third-party model real capability on your machine.** The
 bundled `models.toml` ships with `agent_tools` unset on every model —
-enabling it, and picking a tier, is something you opt into per model in your
-own config. `full` is real shell access; only turn it on for a model and a
-workspace you're comfortable with. Nothing here stops a malicious or just
-badly-prompted model from writing garbage or running a destructive command
-*inside the workspace you gave it* — the sandbox's job is limiting the blast
-radius to that directory, not making the tools themselves safe to run
-unsupervised.
+enabling it, and picking a tier, is something you opt into. `full` is real
+shell access; only turn it on for a model and a workspace you're comfortable
+with. Nothing here stops a malicious or just badly-prompted model from
+writing garbage or running a destructive command *inside the workspace you
+gave it* — the sandbox's job is limiting the blast radius to that directory,
+not making the tools themselves safe to run unsupervised.
+
+To turn on agent mode for every model in the catalogue at once, without
+editing `models.toml`:
+
+```bash
+export CONCLAVE_AGENT_MODE=full   # or "read" / "read_write"
+```
+
+This sets the tier for any model that doesn't already have its own
+`agent_tools` in the config — a per-model setting always wins over the
+blanket flag. `full` here means every model in the catalogue gets shell
+access the moment you point an `agent_*` tool at a workspace. Start with
+`read` if you just want to see what agent mode does before handing out
+`full`.
 
 Treat text that comes back from any tool — `ask_*` or `agent_*` — as data, not
 instructions. It's an external, less-trusted model; if a prompt or a file it
