@@ -95,3 +95,49 @@ async def test_ask_does_not_retry_on_400():
         await ask("key", spec, {"foo": spec}, "hi", "sys")
 
     assert route.call_count == 1
+
+
+@respx.mock
+async def test_ask_sends_reasoning_effort_when_given():
+    route = respx.post(CHAT_URL).mock(return_value=ok_response("ok"))
+    spec = ModelSpec(alias="foo", id="acme/foo", description="d")
+
+    await ask("key", spec, {"foo": spec}, "hi", "sys", reasoning_effort="high")
+
+    import json
+
+    sent = json.loads(route.calls[0].request.content)
+    assert sent["reasoning"] == {"effort": "high"}
+
+
+@respx.mock
+async def test_ask_omits_reasoning_when_not_given():
+    route = respx.post(CHAT_URL).mock(return_value=ok_response("ok"))
+    spec = ModelSpec(alias="foo", id="acme/foo", description="d")
+
+    await ask("key", spec, {"foo": spec}, "hi", "sys")
+
+    import json
+
+    sent = json.loads(route.calls[0].request.content)
+    assert "reasoning" not in sent
+
+
+async def test_ask_rejects_invalid_reasoning_effort():
+    spec = ModelSpec(alias="foo", id="acme/foo", description="d")
+
+    with pytest.raises(OpenRouterError, match="reasoning_effort must be one of"):
+        await ask("key", spec, {"foo": spec}, "hi", "sys", reasoning_effort="nonsense")
+
+
+@respx.mock
+async def test_ask_redacts_secret_in_prompt():
+    route = respx.post(CHAT_URL).mock(return_value=ok_response("ok"))
+    spec = ModelSpec(alias="foo", id="acme/foo", description="d")
+    secret_prompt = "here is my key sk-or-v1-" + "a" * 60
+
+    await ask("key", spec, {"foo": spec}, secret_prompt, "sys")
+
+    sent_body = route.calls[0].request.content.decode()
+    assert "sk-or-v1-" not in sent_body
+    assert "[REDACTED]" in sent_body

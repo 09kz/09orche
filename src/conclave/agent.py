@@ -9,6 +9,8 @@ import httpx
 
 from conclave import cost
 from conclave._http import get_timeout, post_with_retry
+from conclave.reasoning import build_reasoning_param
+from conclave.redact import redact
 from conclave.tools import dispatch, schemas_for_tier
 
 BASE_URL = "https://openrouter.ai/api/v1"
@@ -32,16 +34,22 @@ async def run_agent(
     workspace: Path,
     prompt: str,
     max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> str:
+    try:
+        reasoning = build_reasoning_param(reasoning_effort)
+    except ValueError as e:
+        raise AgentError(str(e)) from e
+
     tools = schemas_for_tier(tier)
     messages: list[dict] = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        {"role": "user", "content": prompt},
+        {"role": "user", "content": redact(prompt)},
     ]
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://github.com/conclave-mcp/conclave",
+        "HTTP-Referer": "https://github.com/09kz/claude-openrouter-subagents",
         "X-Title": "Conclave",
     }
 
@@ -55,6 +63,8 @@ async def run_agent(
             payload: dict = {"model": model_id, "messages": messages, "tools": tools}
             if max_tokens is not None:
                 payload["max_tokens"] = max_tokens
+            if reasoning is not None:
+                payload["reasoning"] = reasoning
 
             try:
                 r = await post_with_retry(
@@ -90,7 +100,7 @@ async def run_agent(
                     {
                         "role": "tool",
                         "tool_call_id": call["id"],
-                        "content": result.output,
+                        "content": redact(result.output),
                     }
                 )
 

@@ -153,6 +153,45 @@ async def test_agent_refuses_when_budget_already_exhausted(workspace, monkeypatc
 
 
 @respx.mock
+async def test_agent_sends_reasoning_effort_when_given(workspace):
+    route = respx.post(CHAT_URL).mock(return_value=final_answer("ok"))
+
+    await run_agent(
+        "key", "acme/model", "read", workspace, "hi", reasoning_effort="low"
+    )
+
+    sent = json.loads(route.calls[0].request.content)
+    assert sent["reasoning"] == {"effort": "low"}
+
+
+async def test_agent_rejects_invalid_reasoning_effort(workspace):
+    with pytest.raises(AgentError, match="reasoning_effort must be one of"):
+        await run_agent(
+            "key", "acme/model", "read", workspace, "hi", reasoning_effort="nonsense"
+        )
+
+
+@respx.mock
+async def test_agent_redacts_secret_in_tool_result(workspace, tmp_path):
+    secret_file = workspace / "creds.txt"
+    secret_file.write_text("sk-or-v1-" + "a1b2c3" * 10, encoding="utf-8")
+
+    route = respx.post(CHAT_URL).mock(
+        side_effect=[
+            tool_call_response("read_file", {"path": "creds.txt"}),
+            final_answer("done"),
+        ]
+    )
+
+    await run_agent("key", "acme/model", "read", workspace, "read creds.txt")
+
+    second_call_body = json.loads(route.calls[1].request.content)
+    tool_message = next(m for m in second_call_body["messages"] if m.get("role") == "tool")
+    assert "sk-or-v1-" not in tool_message["content"]
+    assert "[REDACTED]" in tool_message["content"]
+
+
+@respx.mock
 async def test_agent_write_tool_unavailable_at_read_tier(workspace):
     respx.post(CHAT_URL).mock(
         side_effect=[

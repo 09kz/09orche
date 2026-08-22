@@ -7,6 +7,8 @@ import httpx
 from conclave import cost
 from conclave._http import get_timeout, post_with_retry
 from conclave.config import ModelSpec
+from conclave.reasoning import build_reasoning_param
+from conclave.redact import redact
 
 BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -30,26 +32,38 @@ def _extract_text(body: dict) -> str:
 
 
 async def _call_with_retry(
-    api_key: str, model_id: str, prompt: str, system_prompt: str, max_tokens: int
+    api_key: str,
+    model_id: str,
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int,
+    reasoning_effort: str | None,
 ) -> str:
     try:
         cost.check_budget(model_id)
     except cost.BudgetExceededError as e:
         raise OpenRouterError(str(e)) from e
 
+    try:
+        reasoning = build_reasoning_param(reasoning_effort)
+    except ValueError as e:
+        raise OpenRouterError(str(e)) from e
+
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://github.com/conclave-mcp/conclave",
+        "HTTP-Referer": "https://github.com/09kz/claude-openrouter-subagents",
         "X-Title": "Conclave",
     }
-    payload = {
+    payload: dict = {
         "model": model_id,
         "max_tokens": max_tokens,
         "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
+            {"role": "system", "content": redact(system_prompt)},
+            {"role": "user", "content": redact(prompt)},
         ],
     }
+    if reasoning is not None:
+        payload["reasoning"] = reasoning
 
     async with httpx.AsyncClient(timeout=get_timeout()) as client:
         try:
@@ -81,12 +95,15 @@ async def ask(
     prompt: str,
     system_prompt: str,
     *,
+    reasoning_effort: str | None = None,
     _visited: frozenset[str] = frozenset(),
 ) -> str:
     """Call `spec`'s model; on exhausted retries, fall through to its fallback if set."""
     max_tokens = spec.max_tokens or DEFAULT_MAX_TOKENS
     try:
-        return await _call_with_retry(api_key, spec.id, prompt, system_prompt, max_tokens)
+        return await _call_with_retry(
+            api_key, spec.id, prompt, system_prompt, max_tokens, reasoning_effort
+        )
     except OpenRouterError as e:
         if spec.fallback is None or spec.fallback in _visited:
             raise
@@ -98,6 +115,7 @@ async def ask(
             catalogue,
             prompt,
             system_prompt,
+            reasoning_effort=reasoning_effort,
             _visited=_visited | {spec.alias},
         )
         return note + result

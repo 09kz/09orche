@@ -50,24 +50,35 @@ def build_server() -> FastMCP:
     mcp = FastMCP("conclave")
 
     def make_tool(alias: str):
-        async def tool(prompt: str, system_prompt: str = DEFAULT_SYSTEM_PROMPT) -> str:
+        async def tool(
+            prompt: str,
+            system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+            reasoning_effort: str | None = None,
+        ) -> str:
             spec = catalogue[alias]
             try:
-                return await ask(api_key, spec, catalogue, prompt, system_prompt)
+                return await ask(
+                    api_key,
+                    spec,
+                    catalogue,
+                    prompt,
+                    system_prompt,
+                    reasoning_effort=reasoning_effort,
+                )
             except OpenRouterError as e:
                 return f"conclave: {e}"
 
         return tool
 
     def make_agent_tool(alias: str, tier: str):
-        async def tool(prompt: str, workspace: str) -> str:
+        async def tool(prompt: str, workspace: str, reasoning_effort: str | None = None) -> str:
             spec = catalogue[alias]
             ws_path = Path(workspace).resolve()
             if not ws_path.is_dir():
                 return f"conclave: workspace is not a directory: {workspace}"
             try:
                 return await run_agent(
-                    api_key, spec.id, tier, ws_path, prompt, spec.max_tokens
+                    api_key, spec.id, tier, ws_path, prompt, spec.max_tokens, reasoning_effort
                 )
             except AgentError as e:
                 return f"conclave: {e}"
