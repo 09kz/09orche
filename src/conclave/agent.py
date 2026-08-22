@@ -7,11 +7,11 @@ from pathlib import Path
 
 import httpx
 
-from conclave._http import post_with_retry
+from conclave import cost
+from conclave._http import get_timeout, post_with_retry
 from conclave.tools import dispatch, schemas_for_tier
 
 BASE_URL = "https://openrouter.ai/api/v1"
-TIMEOUT = httpx.Timeout(600.0, connect=15.0)
 MAX_ITERATIONS = 15
 
 AGENT_SYSTEM_PROMPT = """\
@@ -45,8 +45,13 @@ async def run_agent(
         "X-Title": "Conclave",
     }
 
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=get_timeout()) as client:
         for _ in range(MAX_ITERATIONS):
+            try:
+                cost.check_budget(model_id)
+            except cost.BudgetExceededError as e:
+                raise AgentError(str(e)) from e
+
             payload: dict = {"model": model_id, "messages": messages, "tools": tools}
             if max_tokens is not None:
                 payload["max_tokens"] = max_tokens
@@ -64,6 +69,8 @@ async def run_agent(
             body = r.json()
             if "error" in body:
                 raise AgentError(f"{model_id} returned an error: {body['error']}")
+
+            cost.record((body.get("usage") or {}).get("cost"))
 
             message = body["choices"][0]["message"]
             tool_calls = message.get("tool_calls")

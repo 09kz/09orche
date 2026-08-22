@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import httpx
 
-from conclave._http import post_with_retry
+from conclave import cost
+from conclave._http import get_timeout, post_with_retry
 from conclave.config import ModelSpec
 
 BASE_URL = "https://openrouter.ai/api/v1"
-TIMEOUT = httpx.Timeout(300.0, connect=15.0)
 
 # Applied when a model's `max_tokens` isn't set in models.toml. Without an
 # explicit value, some OpenRouter routes fall back to a provider-specific
@@ -32,6 +32,11 @@ def _extract_text(body: dict) -> str:
 async def _call_with_retry(
     api_key: str, model_id: str, prompt: str, system_prompt: str, max_tokens: int
 ) -> str:
+    try:
+        cost.check_budget(model_id)
+    except cost.BudgetExceededError as e:
+        raise OpenRouterError(str(e)) from e
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "HTTP-Referer": "https://github.com/conclave-mcp/conclave",
@@ -46,7 +51,7 @@ async def _call_with_retry(
         ],
     }
 
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=get_timeout()) as client:
         try:
             r = await post_with_retry(client, f"{BASE_URL}/chat/completions", headers, payload)
         except httpx.TransportError as e:
@@ -59,10 +64,14 @@ async def _call_with_retry(
     if "error" in body:
         raise OpenRouterError(f"{model_id} returned an error: {body['error']}")
 
-    text = _extract_text(body)
     usage = body.get("usage") or {}
+    cost.record(usage.get("cost"))
+
+    text = _extract_text(body)
     tokens = usage.get("total_tokens", "?")
-    return f"{text}\n\n---\n{model_id} · {tokens} tokens"
+    call_cost = usage.get("cost")
+    cost_note = f" · ${call_cost:.4f}" if call_cost else ""
+    return f"{text}\n\n---\n{model_id} · {tokens} tokens{cost_note}"
 
 
 async def ask(

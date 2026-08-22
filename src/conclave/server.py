@@ -6,6 +6,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+from conclave import cost
 from conclave.agent import AgentError, run_agent
 from conclave.client import OpenRouterError, ask
 from conclave.config import load_models_or_exit
@@ -25,11 +26,25 @@ _TIER_VERBS = {
 }
 
 
+def _validate_numeric_env(name: str) -> None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return
+    try:
+        float(raw)
+    except ValueError:
+        print(f"conclave: {name} must be a number (got {raw!r})", file=sys.stderr)
+        raise SystemExit(1) from None
+
+
 def build_server() -> FastMCP:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         print("conclave: OPENROUTER_API_KEY is not set", file=sys.stderr)
         raise SystemExit(1)
+
+    _validate_numeric_env("CONCLAVE_MAX_COST_USD")
+    _validate_numeric_env("CONCLAVE_TIMEOUT_S")
 
     catalogue = load_models_or_exit()
     mcp = FastMCP("conclave")
@@ -81,6 +96,11 @@ def build_server() -> FastMCP:
             agent = f" [agent: {spec.agent_tools}]" if spec.agent_tools else ""
             lines.append(f"ask_{alias:<20} {spec.id}{fb}{agent}")
         return "Available models:\n" + "\n".join(lines)
+
+    @mcp.tool()
+    async def spend_status() -> str:
+        """Report this session's cumulative OpenRouter spend and budget, if any."""
+        return cost.status()
 
     return mcp
 

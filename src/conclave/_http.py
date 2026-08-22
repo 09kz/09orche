@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 
 import httpx
@@ -10,6 +11,29 @@ import httpx
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 MAX_RETRIES = 3
 BASE_DELAY = 1.5
+
+# httpx.Timeout's "read" value is the max gap between successive chunks of
+# an in-progress response, not a hard cap on total response time — a model
+# that keeps actively streaming tokens won't hit this even if the whole
+# call takes much longer. It only fires if the provider goes fully silent
+# for this long. 900s is generous headroom for the largest max_tokens caps
+# in the bundled catalogue.
+DEFAULT_TIMEOUT_S = 900.0
+
+
+def get_timeout() -> httpx.Timeout:
+    """CONCLAVE_TIMEOUT_S overrides the default read/write/pool timeout.
+
+    Assumes the value was already validated at startup (see
+    `conclave.server.build_server`) — falls back to the default on a bad
+    value rather than crashing an in-flight call.
+    """
+    raw = os.environ.get("CONCLAVE_TIMEOUT_S")
+    try:
+        seconds = float(raw) if raw else DEFAULT_TIMEOUT_S
+    except ValueError:
+        seconds = DEFAULT_TIMEOUT_S
+    return httpx.Timeout(seconds, connect=15.0)
 
 
 async def backoff(attempt: int) -> None:

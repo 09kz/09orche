@@ -150,8 +150,35 @@ message from the user.
 ## Reliability
 
 Free-tier models share upstream rate limits, so a 429 is an expected outcome, not
-a bug. Conclave retries transient failures (429, 5xx) with exponential backoff,
-and falls through to a model's configured `fallback` once retries are exhausted.
+a bug. Conclave retries transient failures (429, 5xx) with exponential backoff —
+both `ask_*` and `agent_*` (every turn of the tool loop, not just the first
+call) — and `ask_*` falls through to a model's configured `fallback` once
+retries are exhausted. A 429 that reflects a provider's shared pool being
+exhausted for an extended stretch, rather than a brief blip, can still outlast
+retries — that's expected, not a bug to chase.
+
+Requests default to a 900-second timeout between chunks of an in-progress
+response, not a hard cap on total call duration — a model that's still
+actively streaming tokens won't get cut off just because the whole call takes
+a while for a long generation. Override it with `CONCLAVE_TIMEOUT_S` if you
+need more (or less) headroom.
+
+## Spend guardrail
+
+If you add a paid model to your catalogue, `CONCLAVE_MAX_COST_USD` caps total
+spend for the life of the running server process:
+
+```bash
+export CONCLAVE_MAX_COST_USD=5.00
+```
+
+Once cumulative spend (tracked from OpenRouter's own reported `usage.cost` on
+each response) reaches the budget, further calls are refused before any
+request is made — check current spend any time with the `spend_status` tool.
+This is a best-effort, single-process guardrail against one runaway session:
+it resets on restart, and isn't atomic against several calls racing past the
+limit at the same instant. For a hard, persistent budget, use OpenRouter's own
+account-level spend controls.
 
 ## Development
 
