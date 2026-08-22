@@ -1,8 +1,8 @@
 import pytest
 
-from conclave import client
+from conclave import _http
 
 
 @pytest.fixture(autouse=True)
 def fast_backoff(monkeypatch):
-    monkeypatch.setattr(client, "BASE_DELAY", 0.001)
+    monkeypatch.setattr(_http, "BASE_DELAY", 0.001)

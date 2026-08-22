@@ -104,6 +104,42 @@ async def test_agent_raises_on_http_error(workspace):
 
 
 @respx.mock
+async def test_agent_retries_429_within_a_single_turn(workspace):
+    route = respx.post(CHAT_URL).mock(
+        side_effect=[httpx.Response(429), final_answer("recovered")]
+    )
+
+    result = await run_agent("key", "acme/model", "read", workspace, "hi")
+
+    assert result == "recovered"
+    assert route.call_count == 2
+
+
+@respx.mock
+async def test_agent_retries_429_on_a_later_turn(workspace):
+    route = respx.post(CHAT_URL).mock(
+        side_effect=[
+            tool_call_response("read_file", {"path": "notes.txt"}),
+            httpx.Response(429),
+            final_answer("recovered after tool use"),
+        ]
+    )
+
+    result = await run_agent("key", "acme/model", "read", workspace, "read then answer")
+
+    assert result == "recovered after tool use"
+    assert route.call_count == 3
+
+
+@respx.mock
+async def test_agent_raises_after_exhausting_retries(workspace):
+    respx.post(CHAT_URL).mock(return_value=httpx.Response(429))
+
+    with pytest.raises(AgentError, match="429"):
+        await run_agent("key", "acme/model", "read", workspace, "hi")
+
+
+@respx.mock
 async def test_agent_write_tool_unavailable_at_read_tier(workspace):
     respx.post(CHAT_URL).mock(
         side_effect=[

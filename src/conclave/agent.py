@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 
+from conclave._http import post_with_retry
 from conclave.tools import dispatch, schemas_for_tier
 
 BASE_URL = "https://openrouter.ai/api/v1"
@@ -38,21 +39,25 @@ async def run_agent(
         {"role": "user", "content": prompt},
     ]
 
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://github.com/conclave-mcp/conclave",
+        "X-Title": "Conclave",
+    }
+
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         for _ in range(MAX_ITERATIONS):
             payload: dict = {"model": model_id, "messages": messages, "tools": tools}
             if max_tokens is not None:
                 payload["max_tokens"] = max_tokens
 
-            r = await client.post(
-                f"{BASE_URL}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "HTTP-Referer": "https://github.com/conclave-mcp/conclave",
-                    "X-Title": "Conclave",
-                },
-                json=payload,
-            )
+            try:
+                r = await post_with_retry(
+                    client, f"{BASE_URL}/chat/completions", headers, payload
+                )
+            except httpx.TransportError as e:
+                raise AgentError(f"network error calling {model_id}: {e}") from e
+
             if r.status_code != 200:
                 raise AgentError(f"{model_id} returned HTTP {r.status_code}:\n{r.text[:600]}")
 
