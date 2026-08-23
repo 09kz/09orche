@@ -22,13 +22,13 @@ DEFAULT_TIMEOUT_S = 900.0
 
 
 def get_timeout() -> httpx.Timeout:
-    """CONCLAVE_TIMEOUT_S overrides the default read/write/pool timeout.
+    """ORCHE_TIMEOUT_S overrides the default read/write/pool timeout.
 
     Assumes the value was already validated at startup (see
-    `conclave.server.build_server`) — falls back to the default on a bad
+    `orche.server.build_server`) — falls back to the default on a bad
     value rather than crashing an in-flight call.
     """
-    raw = os.environ.get("CONCLAVE_TIMEOUT_S")
+    raw = os.environ.get("ORCHE_TIMEOUT_S")
     try:
         seconds = float(raw) if raw else DEFAULT_TIMEOUT_S
     except ValueError:

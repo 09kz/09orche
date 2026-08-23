@@ -1,4 +1,4 @@
-"""Conclave — delegate work to OpenRouter models from Claude Code."""
+"""Orche — delegate work to OpenRouter models from Claude Code."""
 
 import os
 import sys
@@ -6,14 +6,14 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from conclave import cost
-from conclave.agent import AgentError, run_agent
-from conclave.client import OpenRouterError, ask
-from conclave.config import AGENT_TIERS, ConfigError, load_models_or_exit, validate_alias_name
-from conclave.profiles import Profile
-from conclave.profiles import load_profiles as _load_profiles
-from conclave.profiles import save_profile as _save_profile
-from conclave.reasoning import VALID_EFFORTS
+from orche import cost
+from orche.agent import AgentError, run_agent
+from orche.client import OpenRouterError, ask
+from orche.config import AGENT_TIERS, ConfigError, load_models_or_exit, validate_alias_name
+from orche.profiles import Profile
+from orche.profiles import load_profiles as _load_profiles
+from orche.profiles import save_profile as _save_profile
+from orche.reasoning import VALID_EFFORTS
 
 DEFAULT_SYSTEM_PROMPT = "You are a helpful expert assistant."
 
@@ -37,21 +37,21 @@ def _validate_numeric_env(name: str) -> None:
     try:
         float(raw)
     except ValueError:
-        print(f"conclave: {name} must be a number (got {raw!r})", file=sys.stderr)
+        print(f"orche: {name} must be a number (got {raw!r})", file=sys.stderr)
         raise SystemExit(1) from None
 
 
 def build_server() -> FastMCP:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        print("conclave: OPENROUTER_API_KEY is not set", file=sys.stderr)
+        print("orche: OPENROUTER_API_KEY is not set", file=sys.stderr)
         raise SystemExit(1)
 
-    _validate_numeric_env("CONCLAVE_MAX_COST_USD")
-    _validate_numeric_env("CONCLAVE_TIMEOUT_S")
+    _validate_numeric_env("ORCHE_MAX_COST_USD")
+    _validate_numeric_env("ORCHE_TIMEOUT_S")
 
     catalogue = load_models_or_exit()
-    mcp = FastMCP("conclave")
+    mcp = FastMCP("orche")
 
     def make_tool(alias: str):
         async def tool(
@@ -70,7 +70,7 @@ def build_server() -> FastMCP:
                     reasoning_effort=reasoning_effort,
                 )
             except OpenRouterError as e:
-                return f"conclave: {e}"
+                return f"orche: {e}"
 
         return tool
 
@@ -79,13 +79,13 @@ def build_server() -> FastMCP:
             spec = catalogue[alias]
             ws_path = Path(workspace).resolve()
             if not ws_path.is_dir():
-                return f"conclave: workspace is not a directory: {workspace}"
+                return f"orche: workspace is not a directory: {workspace}"
             try:
                 return await run_agent(
                     api_key, spec.id, tier, ws_path, prompt, spec.max_tokens, reasoning_effort
                 )
             except AgentError as e:
-                return f"conclave: {e}"
+                return f"orche: {e}"
 
         return tool
 
@@ -104,7 +104,7 @@ def build_server() -> FastMCP:
 
     @mcp.tool()
     async def list_models() -> str:
-        """List the models available in Conclave, with their OpenRouter ids and fallbacks."""
+        """List the models available in Orche, with their OpenRouter ids and fallbacks."""
         lines = []
         for alias, spec in catalogue.items():
             fb = f" -> fallback: {spec.fallback}" if spec.fallback else ""
@@ -131,13 +131,13 @@ def build_server() -> FastMCP:
         try:
             validate_alias_name(name)
         except ConfigError as e:
-            return f"conclave: {e}"
+            return f"orche: {e}"
         if base_alias not in catalogue:
-            return f"conclave: unknown base_alias {base_alias!r}, see list_models"
+            return f"orche: unknown base_alias {base_alias!r}, see list_models"
         if reasoning_effort is not None and reasoning_effort not in VALID_EFFORTS:
-            return f"conclave: reasoning_effort must be one of {VALID_EFFORTS}"
+            return f"orche: reasoning_effort must be one of {VALID_EFFORTS}"
         if agent_tools is not None and agent_tools not in AGENT_TIERS:
-            return f"conclave: agent_tools must be one of {AGENT_TIERS}"
+            return f"orche: agent_tools must be one of {AGENT_TIERS}"
 
         profile = Profile(
             name=name,
@@ -149,7 +149,7 @@ def build_server() -> FastMCP:
         try:
             _save_profile(profile)
         except ConfigError as e:
-            return f"conclave: {e}"
+            return f"orche: {e}"
         return f"saved profile {name!r} (base: {base_alias})"
 
     @mcp.tool()
@@ -158,7 +158,7 @@ def build_server() -> FastMCP:
         try:
             profiles = _load_profiles()
         except ConfigError as e:
-            return f"conclave: {e}"
+            return f"orche: {e}"
         if not profiles:
             return "No profiles saved yet. Create one with save_profile."
         lines = []
@@ -173,13 +173,13 @@ def build_server() -> FastMCP:
         try:
             profiles = _load_profiles()
         except ConfigError as e:
-            return f"conclave: {e}"
+            return f"orche: {e}"
         profile = profiles.get(name)
         if profile is None:
-            return f"conclave: unknown profile {name!r}, see list_profiles"
+            return f"orche: unknown profile {name!r}, see list_profiles"
         if profile.base_alias not in catalogue:
             return (
-                f"conclave: profile {name!r} references base_alias "
+                f"orche: profile {name!r} references base_alias "
                 f"{profile.base_alias!r}, which is no longer in the catalogue"
             )
         return profile
@@ -201,7 +201,7 @@ def build_server() -> FastMCP:
                 reasoning_effort=profile.reasoning_effort,
             )
         except OpenRouterError as e:
-            return f"conclave: {e}"
+            return f"orche: {e}"
 
     @mcp.tool()
     async def agent_profile(name: str, prompt: str, workspace: str) -> str:
@@ -213,13 +213,13 @@ def build_server() -> FastMCP:
         tier = profile.agent_tools or spec.agent_tools
         if tier is None:
             return (
-                f"conclave: profile {name!r} has no agent_tools tier, and neither "
+                f"orche: profile {name!r} has no agent_tools tier, and neither "
                 f"does its base model {profile.base_alias!r} — set one on the "
                 "profile (save_profile) or the base model (models.toml)"
             )
         ws_path = Path(workspace).resolve()
         if not ws_path.is_dir():
-            return f"conclave: workspace is not a directory: {workspace}"
+            return f"orche: workspace is not a directory: {workspace}"
         try:
             return await run_agent(
                 api_key,
@@ -232,7 +232,7 @@ def build_server() -> FastMCP:
                 profile.system_prompt,
             )
         except AgentError as e:
-            return f"conclave: {e}"
+            return f"orche: {e}"
 
     return mcp
 

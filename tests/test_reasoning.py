@@ -1,6 +1,6 @@
 import pytest
 
-from conclave.reasoning import build_reasoning_param
+from orche.reasoning import build_reasoning_param
 
 
 def test_none_returns_none():

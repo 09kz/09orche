@@ -1,4 +1,4 @@
-# Conclave model catalogue.
+# Orche model catalogue.
 #
 # Each [models.<alias>] block becomes a tool named `ask_<alias>`.
 # `id` must be a valid OpenRouter model id — verify at
@@ -16,11 +16,11 @@
 # tool, `agent_<alias>`, that gives the model sandboxed file/shell access
 # scoped to one workspace directory per call — see README for what each tier
 # permits. Left unset here deliberately: this file ships to anyone who
-# installs Conclave, and handing an external model shell access by default
+# installs Orche, and handing an external model shell access by default
 # is not a safe out-of-the-box choice. Enable it in your own override file
-# (CONCLAVE_MODELS_PATH) if you want it.
+# (ORCHE_MODELS_PATH) if you want it.
 #
-# Override this file by pointing CONCLAVE_MODELS_PATH at your own copy,
+# Override this file by pointing ORCHE_MODELS_PATH at your own copy,
 # or by placing a models.toml in your current working directory.
 
 [models.ox_alpha]

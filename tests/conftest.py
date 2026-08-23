@@ -1,6 +1,6 @@
 import pytest
 
-from conclave import _http, cost
+from orche import _http, cost
 
 
 @pytest.fixture(autouse=True)

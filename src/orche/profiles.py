@@ -16,8 +16,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from conclave.config import AGENT_TIERS, ConfigError, validate_alias_name
-from conclave.reasoning import VALID_EFFORTS
+from orche.config import AGENT_TIERS, ConfigError, validate_alias_name
+from orche.reasoning import VALID_EFFORTS
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,7 @@ class Profile:
 
 
 def _resolve_path() -> Path:
-    env_path = os.environ.get("CONCLAVE_PROFILES_PATH")
+    env_path = os.environ.get("ORCHE_PROFILES_PATH")
     if env_path:
         return Path(env_path)
     return Path.cwd() / "profiles.toml"

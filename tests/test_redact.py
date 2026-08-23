@@ -1,4 +1,4 @@
-from conclave.redact import redact
+from orche.redact import redact
 
 
 def test_redacts_openrouter_key():

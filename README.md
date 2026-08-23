@@ -1,4 +1,4 @@
-# claude-openrouter-subagents
+# 09orche
 
 Expose OpenRouter models as tools inside Claude Code, so your orchestrator can
 delegate work to them without leaving your Anthropic subscription.
@@ -23,18 +23,18 @@ sandboxed file and shell access instead.
 ## Install
 
 ```bash
-uvx claude-openrouter-subagents
+uvx 09orche
 ```
 
 or add it straight to Claude Code:
 
 ```bash
-claude mcp add conclave -s user \
+claude mcp add orche -s user \
   -e "OPENROUTER_API_KEY=your-key-here" \
-  -- uvx claude-openrouter-subagents
+  -- uvx 09orche
 ```
 
-Add `-e "CONCLAVE_AGENT_MODE=full"` to that same command if you want every
+Add `-e "ORCHE_AGENT_MODE=full"` to that same command if you want every
 model to come up with full agent tools (file access + shell) from the start
 — see [Agent mode](#agent-mode) before you do.
 
@@ -45,7 +45,7 @@ to use it as shipped.
 Restart Claude Code (or run `claude mcp list` to confirm the server shows
 `Connected`) and the tools are available.
 
-**Note:** `claude mcp get conclave` prints your `OPENROUTER_API_KEY` in
+**Note:** `claude mcp get orche` prints your `OPENROUTER_API_KEY` in
 cleartext — that's how Claude Code stores and reports every stdio MCP server's
 environment, not something specific to this project. If you run that command where
 someone else might see the output (a shared terminal, a screen share, a
@@ -88,7 +88,7 @@ agent_profile("reviewer", prompt="...", workspace="/path/to/project")
 ```
 
 `list_profiles` shows what's saved. Profiles live in `profiles.toml`
-(resolved the same way as `CONCLAVE_MODELS_PATH`: `CONCLAVE_PROFILES_PATH` env
+(resolved the same way as `ORCHE_MODELS_PATH`: `ORCHE_PROFILES_PATH` env
 var, else `./profiles.toml`) — a missing file just means none exist yet.
 `agent_tools` on a profile overrides its base model's tier for that profile
 only; if neither the profile nor the base model has one set, `agent_profile`
@@ -106,7 +106,7 @@ The bundled catalogue lives in `models.toml`. Override it by placing your own
 at any file:
 
 ```bash
-export CONCLAVE_MODELS_PATH=/path/to/your/models.toml
+export ORCHE_MODELS_PATH=/path/to/your/models.toml
 ```
 
 Each entry becomes a tool named `ask_<alias>`:
@@ -168,7 +168,7 @@ To turn on agent mode for every model in the catalogue at once, without
 editing `models.toml`:
 
 ```bash
-export CONCLAVE_AGENT_MODE=full   # or "read" / "read_write"
+export ORCHE_AGENT_MODE=full   # or "read" / "read_write"
 ```
 
 This sets the tier for any model that doesn't already have its own
@@ -205,16 +205,16 @@ retries — that's expected, not a bug to chase.
 Requests default to a 900-second timeout between chunks of an in-progress
 response, not a hard cap on total call duration — a model that's still
 actively streaming tokens won't get cut off just because the whole call takes
-a while for a long generation. Override it with `CONCLAVE_TIMEOUT_S` if you
+a while for a long generation. Override it with `ORCHE_TIMEOUT_S` if you
 need more (or less) headroom.
 
 ## Spend guardrail
 
-If you add a paid model to your catalogue, `CONCLAVE_MAX_COST_USD` caps total
+If you add a paid model to your catalogue, `ORCHE_MAX_COST_USD` caps total
 spend for the life of the running server process:
 
 ```bash
-export CONCLAVE_MAX_COST_USD=5.00
+export ORCHE_MAX_COST_USD=5.00
 ```
 
 Once cumulative spend (tracked from OpenRouter's own reported `usage.cost` on
@@ -228,8 +228,8 @@ account-level spend controls.
 ## Development
 
 ```bash
-git clone https://github.com/09kz/claude-openrouter-subagents
-cd claude-openrouter-subagents
+git clone https://github.com/09kz/09orche
+cd 09orche
 uv venv .venv
 uv pip install --python .venv/Scripts/python.exe -e ".[dev]"
 pytest

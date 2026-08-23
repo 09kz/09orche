@@ -5,13 +5,13 @@ separate Claude Code Desktop windows with Sonnet 5, given the exact same
 task: write `lru_cache.py` (thread-safe LRU cache) and `rate_limiter.py`
 (token-bucket rate limiter), each with pytest tests.
 
-`sonnet5/` — solo, no delegation. `sonnet5-conclave/` — delegated both
+`sonnet5/` — solo, no delegation. `sonnet5-orche/` — delegated both
 modules to `ask_ox_alpha` in a single parallel batch (two tool calls, one
 message).
 
 ## Result: solo won, ~3x
 
-| | Solo (`sonnet5/`) | Delegated (`sonnet5-conclave/`) |
+| | Solo (`sonnet5/`) | Delegated (`sonnet5-orche/`) |
 |---|---|---|
 | Wall clock | ~5 min | ~15 min |
 | Lines produced | 514 | 413 |

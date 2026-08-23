@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import httpx
 
-from conclave import cost
-from conclave._http import get_timeout, post_with_retry
-from conclave.config import ModelSpec
-from conclave.reasoning import build_reasoning_param
-from conclave.redact import redact
+from orche import cost
+from orche._http import get_timeout, post_with_retry
+from orche.config import ModelSpec
+from orche.reasoning import build_reasoning_param
+from orche.redact import redact
 
 BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -51,8 +51,8 @@ async def _call_with_retry(
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://github.com/09kz/claude-openrouter-subagents",
-        "X-Title": "Conclave",
+        "HTTP-Referer": "https://github.com/09kz/09orche",
+        "X-Title": "Orche",
     }
     payload: dict = {
         "model": model_id,

@@ -14,7 +14,7 @@ notable details, license).
 **Solo** (`sonnet5/`): read and summarized all 4 sequentially, no delegation.
 **~20.4s** wall clock (18:17:33.667 → 18:17:54.046).
 
-**Delegated** (`sonnet5-conclave/`): 4 parallel `ask_ox_alpha` calls
+**Delegated** (`sonnet5-orche/`): 4 parallel `ask_ox_alpha` calls
 (`reasoning_effort="low"`, avoiding the truncation failure mode found in
 test 1), one per document, via `asyncio.gather`.
 **41.26s** wall clock — dominated by one call (doc1, ironically the

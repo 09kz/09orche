@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from conclave.tools import (
+from orche.tools import (
     SandboxError,
     dispatch,
     grep,

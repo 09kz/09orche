@@ -1,6 +1,6 @@
 import pytest
 
-from conclave.config import ConfigError, load_models
+from orche.config import ConfigError, load_models
 
 
 def write(tmp_path, text):
@@ -159,7 +159,7 @@ def test_agent_mode_flag_applies_to_all_models(tmp_path, monkeypatch):
         description = "Bar."
         """,
     )
-    monkeypatch.setenv("CONCLAVE_AGENT_MODE", "full")
+    monkeypatch.setenv("ORCHE_AGENT_MODE", "full")
     models = load_models(path)
     assert models["foo"].agent_tools == "full"
     assert models["bar"].agent_tools == "full"
@@ -175,20 +175,20 @@ def test_agent_mode_flag_does_not_override_explicit_per_model_setting(tmp_path, 
         agent_tools = "read"
         """,
     )
-    monkeypatch.setenv("CONCLAVE_AGENT_MODE", "full")
+    monkeypatch.setenv("ORCHE_AGENT_MODE", "full")
     models = load_models(path)
     assert models["foo"].agent_tools == "read"
 
 
 def test_agent_mode_flag_rejects_invalid_tier(tmp_path, monkeypatch):
     path = write(tmp_path, '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\n')
-    monkeypatch.setenv("CONCLAVE_AGENT_MODE", "godmode")
-    with pytest.raises(ConfigError, match="CONCLAVE_AGENT_MODE must be one of"):
+    monkeypatch.setenv("ORCHE_AGENT_MODE", "godmode")
+    with pytest.raises(ConfigError, match="ORCHE_AGENT_MODE must be one of"):
         load_models(path)
 
 
 def test_env_var_overrides_cwd(tmp_path, monkeypatch):
     real = write(tmp_path, '[models.foo]\nid = "acme/foo"\ndescription = "Foo."\n')
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(real))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(real))
     models = load_models()
     assert set(models) == {"foo"}

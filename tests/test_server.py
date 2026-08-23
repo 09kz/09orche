@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from conclave.server import build_server
+from orche.server import build_server
 
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -14,7 +14,7 @@ def server(monkeypatch, tmp_path):
         '[models.foo]\nid = "acme/foo"\ndescription = "A test model."\n',
         encoding="utf-8",
     )
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(models_path))
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     return build_server()
 
@@ -24,7 +24,7 @@ def test_build_server_exits_without_api_key(monkeypatch, tmp_path):
     models_path.write_text(
         '[models.foo]\nid = "acme/foo"\ndescription = "d"\n', encoding="utf-8"
     )
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(models_path))
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     with pytest.raises(SystemExit):
@@ -34,9 +34,9 @@ def test_build_server_exits_without_api_key(monkeypatch, tmp_path):
 def test_build_server_exits_on_invalid_max_cost(monkeypatch, tmp_path):
     models_path = tmp_path / "models.toml"
     models_path.write_text('[models.foo]\nid = "acme/foo"\ndescription = "d"\n', encoding="utf-8")
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(models_path))
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("CONCLAVE_MAX_COST_USD", "not-a-number")
+    monkeypatch.setenv("ORCHE_MAX_COST_USD", "not-a-number")
 
     with pytest.raises(SystemExit):
         build_server()
@@ -45,9 +45,9 @@ def test_build_server_exits_on_invalid_max_cost(monkeypatch, tmp_path):
 def test_build_server_exits_on_invalid_timeout(monkeypatch, tmp_path):
     models_path = tmp_path / "models.toml"
     models_path.write_text('[models.foo]\nid = "acme/foo"\ndescription = "d"\n', encoding="utf-8")
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(models_path))
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("CONCLAVE_TIMEOUT_S", "soon")
+    monkeypatch.setenv("ORCHE_TIMEOUT_S", "soon")
 
     with pytest.raises(SystemExit):
         build_server()
@@ -98,7 +98,7 @@ def agent_server(monkeypatch, tmp_path):
         '[models.foo]\nid = "acme/foo"\ndescription = "A test model."\nagent_tools = "read"\n',
         encoding="utf-8",
     )
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(models_path))
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     return build_server()
 
@@ -138,14 +138,14 @@ async def test_agent_tool_runs_agent_loop(agent_server, tmp_path):
 
 async def test_spend_status_reports_no_budget_by_default(server):
     result = await server.call_tool("spend_status", {})
-    assert "no CONCLAVE_MAX_COST_USD" in result[0].text
+    assert "no ORCHE_MAX_COST_USD" in result[0].text
 
 
 @respx.mock
 async def test_ask_tool_records_cost_and_spend_status_reflects_it(monkeypatch, tmp_path):
     models_path = tmp_path / "models.toml"
     models_path.write_text('[models.foo]\nid = "acme/foo"\ndescription = "d"\n', encoding="utf-8")
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(models_path))
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     server = build_server()
 
@@ -168,9 +168,9 @@ async def test_ask_tool_records_cost_and_spend_status_reflects_it(monkeypatch, t
 async def test_ask_tool_refuses_once_budget_exhausted(monkeypatch, tmp_path):
     models_path = tmp_path / "models.toml"
     models_path.write_text('[models.foo]\nid = "acme/foo"\ndescription = "d"\n', encoding="utf-8")
-    monkeypatch.setenv("CONCLAVE_MODELS_PATH", str(models_path))
+    monkeypatch.setenv("ORCHE_MODELS_PATH", str(models_path))
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("CONCLAVE_MAX_COST_USD", "0.001")
+    monkeypatch.setenv("ORCHE_MAX_COST_USD", "0.001")
     server = build_server()
 
     route = respx.post(CHAT_URL).mock(
@@ -193,7 +193,7 @@ async def test_ask_tool_refuses_once_budget_exhausted(monkeypatch, tmp_path):
 @pytest.fixture
 def profiles_path(monkeypatch, tmp_path):
     path = tmp_path / "profiles.toml"
-    monkeypatch.setenv("CONCLAVE_PROFILES_PATH", str(path))
+    monkeypatch.setenv("ORCHE_PROFILES_PATH", str(path))
     return path
 
 

@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from conclave._http import post_with_retry
+from orche._http import post_with_retry
 
 URL = "https://example.test/chat"
 

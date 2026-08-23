@@ -2,8 +2,8 @@ import httpx
 import pytest
 import respx
 
-from conclave.client import OpenRouterError, ask
-from conclave.config import ModelSpec
+from orche.client import OpenRouterError, ask
+from orche.config import ModelSpec
 
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 

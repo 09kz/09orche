@@ -1,5 +1,5 @@
 [project]
-name = "claude-openrouter-subagents"
+name = "09orche"
 version = "0.1.0"
 description = "Expose OpenRouter models as sandboxed agent tools for Claude Code"
 readme = "README.md"
@@ -29,21 +29,21 @@ dependencies = [
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "respx>=0.21", "ruff>=0.6", "mypy>=1.11"]
 
 [project.scripts]
-conclave = "conclave.server:main"
+orche = "orche.server:main"
 
 [project.urls]
-Homepage = "https://github.com/09kz/claude-openrouter-subagents"
-Issues = "https://github.com/09kz/claude-openrouter-subagents/issues"
+Homepage = "https://github.com/09kz/09orche"
+Issues = "https://github.com/09kz/09orche/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/conclave"]
+packages = ["src/orche"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/conclave/models.toml" = "conclave/models.toml"
+"src/orche/models.toml" = "orche/models.toml"
 
 [tool.ruff]
 line-length = 100
@@ -58,3 +58,4 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,9 +1,9 @@
 ---
 name: subagent-orchestration
-description: Delegate work to claude-openrouter-subagents tools, decide when a reusable profile is worth creating, and verify subagent output without a rigid mandatory pipeline. Use when the user asks to delegate a task to another model, create a subagent persona, or set up a multi-model workflow.
+description: Delegate work to 09orche tools, decide when a reusable profile is worth creating, and verify subagent output without a rigid mandatory pipeline. Use when the user asks to delegate a task to another model, create a subagent persona, or set up a multi-model workflow.
 ---
 
-# Orchestrating subagents with claude-openrouter-subagents
+# Orchestrating subagents with 09orche
 
 You are the orchestrator. This project's MCP tools (`ask_<alias>`,
 `agent_<alias>`, and the profile tools below) give you access to other

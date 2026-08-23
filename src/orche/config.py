@@ -29,7 +29,7 @@ class ConfigError(Exception):
 
 def _candidate_paths() -> list[Path]:
     candidates = []
-    if env_path := os.environ.get("CONCLAVE_MODELS_PATH"):
+    if env_path := os.environ.get("ORCHE_MODELS_PATH"):
         candidates.append(Path(env_path))
     candidates.append(Path.cwd() / "models.toml")
     return candidates
@@ -50,7 +50,7 @@ def _load_raw(path: Path | None) -> dict:
             raise ConfigError(f"could not read {path}: {e}") from e
     else:
         # fall back to the bundled default catalogue
-        ref = resources.files("conclave").joinpath("models.toml")
+        ref = resources.files("orche").joinpath("models.toml")
         data = ref.read_bytes()
 
     try:
@@ -71,11 +71,11 @@ def load_models(path: Path | None = None) -> dict[str, ModelSpec]:
     """Load and validate the model catalogue.
 
     Resolution order when `path` is not given explicitly:
-    1. `CONCLAVE_MODELS_PATH` env var
+    1. `ORCHE_MODELS_PATH` env var
     2. `./models.toml` in the current working directory
     3. the catalogue bundled with the package
 
-    If `CONCLAVE_AGENT_MODE` is set (to "read", "read_write", or "full"), it
+    If `ORCHE_AGENT_MODE` is set (to "read", "read_write", or "full"), it
     turns on agent mode at that tier for every model that doesn't already set
     its own `agent_tools` — a one-variable way to make the whole catalogue
     agent-capable without editing models.toml.
@@ -133,16 +133,16 @@ def load_models(path: Path | None = None) -> dict[str, ModelSpec]:
 
 
 def _apply_agent_mode_override(specs: dict[str, ModelSpec]) -> dict[str, ModelSpec]:
-    """CONCLAVE_AGENT_MODE, if set, turns on agent mode at that tier for every
+    """ORCHE_AGENT_MODE, if set, turns on agent mode at that tier for every
     model that doesn't already set its own `agent_tools` in models.toml. A
     per-model setting always wins over the blanket flag.
     """
-    override = os.environ.get("CONCLAVE_AGENT_MODE")
+    override = os.environ.get("ORCHE_AGENT_MODE")
     if override is None:
         return specs
     if override not in AGENT_TIERS:
         raise ConfigError(
-            f"CONCLAVE_AGENT_MODE must be one of {AGENT_TIERS} (got {override!r})"
+            f"ORCHE_AGENT_MODE must be one of {AGENT_TIERS} (got {override!r})"
         )
     return {
         alias: spec if spec.agent_tools is not None else replace(spec, agent_tools=override)
@@ -154,5 +154,5 @@ def load_models_or_exit() -> dict[str, ModelSpec]:
     try:
         return load_models()
     except ConfigError as e:
-        print(f"conclave: configuration error: {e}", file=sys.stderr)
+        print(f"orche: configuration error: {e}", file=sys.stderr)
         raise SystemExit(1) from e

@@ -7,11 +7,11 @@ from pathlib import Path
 
 import httpx
 
-from conclave import cost
-from conclave._http import get_timeout, post_with_retry
-from conclave.reasoning import build_reasoning_param
-from conclave.redact import redact
-from conclave.tools import dispatch, schemas_for_tier
+from orche import cost
+from orche._http import get_timeout, post_with_retry
+from orche.reasoning import build_reasoning_param
+from orche.redact import redact
+from orche.tools import dispatch, schemas_for_tier
 
 BASE_URL = "https://openrouter.ai/api/v1"
 MAX_ITERATIONS = 15
@@ -54,8 +54,8 @@ async def run_agent(
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://github.com/09kz/claude-openrouter-subagents",
-        "X-Title": "Conclave",
+        "HTTP-Referer": "https://github.com/09kz/09orche",
+        "X-Title": "Orche",
     }
 
     async with httpx.AsyncClient(timeout=get_timeout()) as client:

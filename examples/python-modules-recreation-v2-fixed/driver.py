@@ -3,10 +3,10 @@ import os
 import sys
 import time
 
-sys.path.insert(0, r"C:\Users\zydek\coding\claude-openrouter-subagents\src")
+sys.path.insert(0, r"C:\Users\zydek\coding\09orche\src")
 
-from conclave.client import ask
-from conclave.config import ModelSpec
+from orche.client import ask
+from orche.config import ModelSpec
 
 SPEC = ModelSpec(alias="ox_alpha", id="stealth/ox-alpha", description="d")
 
@@ -56,12 +56,12 @@ async def main():
     t_total = time.time() - t_start
 
     out_dir = (
-        r"C:\Users\zydek\coding\claude-openrouter-subagents\examples"
-        r"\python-modules-recreation-v2-fixed\sonnet5-conclave"
+        r"C:\Users\zydek\coding\09orche\examples"
+        r"\python-modules-recreation-v2-fixed\sonnet5-orche"
     )
     print(f"TOTAL WALL CLOCK: {t_total:.2f}s\n")
     for filename, result, elapsed in results:
-        # strip the "\n\n---\nmodel · N tokens" footer conclave.client.ask appends
+        # strip the "\n\n---\nmodel · N tokens" footer orche.client.ask appends
         code = result.rsplit("\n\n---\n", 1)[0]
         path = f"{out_dir}\\{filename}"
         with open(path, "w", encoding="utf-8") as f:

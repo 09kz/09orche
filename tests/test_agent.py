@@ -4,8 +4,8 @@ import httpx
 import pytest
 import respx
 
-from conclave import cost
-from conclave.agent import AgentError, run_agent
+from orche import cost
+from orche.agent import AgentError, run_agent
 
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -158,7 +158,7 @@ async def test_agent_raises_after_exhausting_retries(workspace):
 
 @respx.mock
 async def test_agent_refuses_when_budget_already_exhausted(workspace, monkeypatch):
-    monkeypatch.setenv("CONCLAVE_MAX_COST_USD", "0.001")
+    monkeypatch.setenv("ORCHE_MAX_COST_USD", "0.001")
     cost.record(0.01)
     route = respx.post(CHAT_URL).mock(return_value=final_answer("should not be reached"))
 

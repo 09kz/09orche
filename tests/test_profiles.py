@@ -1,7 +1,7 @@
 import pytest
 
-from conclave.config import ConfigError
-from conclave.profiles import Profile, load_profiles, save_profile
+from orche.config import ConfigError
+from orche.profiles import Profile, load_profiles, save_profile
 
 
 def test_load_missing_file_returns_empty_dict(tmp_path):
@@ -112,7 +112,7 @@ def test_invalid_agent_tools_raises(tmp_path):
 def test_env_var_overrides_cwd(tmp_path, monkeypatch):
     real = tmp_path / "real.toml"
     save_profile(Profile(name="foo", base_alias="ox_alpha", system_prompt="Foo."), real)
-    monkeypatch.setenv("CONCLAVE_PROFILES_PATH", str(real))
+    monkeypatch.setenv("ORCHE_PROFILES_PATH", str(real))
 
     loaded = load_profiles()
 
