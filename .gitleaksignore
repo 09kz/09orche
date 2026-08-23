@@ -1,0 +1,3 @@
+# Fake keys in tests/test_redact.py — intentional test fixtures for the redaction feature.
+77205b55edfa6cc42322e14e92de19395b271923:tests/test_redact.py:aws-access-token:21
+77205b55edfa6cc42322e14e92de19395b271923:tests/test_redact.py:private-key:32

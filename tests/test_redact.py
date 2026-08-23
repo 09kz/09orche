@@ -18,7 +18,7 @@ def test_redacts_github_token():
 
 
 def test_redacts_aws_access_key():
-    text = "AWS_ACCESS_KEY_ID=AKIAABCDEFGHIJKLMNOP"
+    text = "AWS_ACCESS_KEY_ID=AKIAABCDEFGHIJKLMNOP"  # gitleaks:allow
     assert "AKIA" not in redact(text)
 
 
@@ -29,7 +29,7 @@ def test_redacts_slack_token():
 
 def test_redacts_private_key_block():
     text = (
-        "-----BEGIN RSA PRIVATE KEY-----\n"
+        "-----BEGIN RSA PRIVATE KEY-----\n"  # gitleaks:allow
         "MIIEpAIBAAKCAQEA...\nmore lines here\n"
         "-----END RSA PRIVATE KEY-----"
     )
