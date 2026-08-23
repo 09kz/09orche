@@ -17,10 +17,26 @@ from orche.reasoning import VALID_EFFORTS
 
 DEFAULT_SYSTEM_PROMPT = "You are a helpful expert assistant."
 
+# Evidence-based, not speculative — see examples/README.md for the measured
+# timing experiments these two lines come from. Kept short deliberately:
+# this text is repeated in every registered model's tool description, so it
+# adds up across a whole catalogue's worth of tools/list output.
+USAGE_TIP = (
+    "\n\nTips: set reasoning_effort explicitly for code generation — left "
+    "unset, a reasoning model can spend its whole budget on hidden "
+    "reasoning and return no code. Don't split an implementation from its "
+    "own tests across separate calls; independently-generated pieces "
+    "reliably drift apart on API details even with matching prompts — "
+    "generate them together in one call instead."
+)
+
 AGENT_TOOL_DESCRIPTION = (
     "{base}\n\nAgent mode ({tier}): given a `workspace` directory, this model can "
     "explore and {verb} files there using its own tool calls, iterating until it "
-    "has an answer. It cannot see or affect anything outside `workspace`."
+    "has an answer. It cannot see or affect anything outside `workspace`. If a "
+    "piece of work needs to match another piece's API, have it read that file "
+    "from the workspace rather than assuming two calls will agree on an "
+    "interface." + USAGE_TIP
 )
 
 _TIER_VERBS = {
@@ -92,7 +108,9 @@ def build_server() -> FastMCP:
     for alias, spec in catalogue.items():
         tool_fn = make_tool(alias)
         tool_fn.__name__ = f"ask_{alias}"
-        mcp.add_tool(tool_fn, name=f"ask_{alias}", description=spec.description)
+        mcp.add_tool(
+            tool_fn, name=f"ask_{alias}", description=spec.description + USAGE_TIP
+        )
 
         if spec.agent_tools is not None:
             agent_fn = make_agent_tool(alias, spec.agent_tools)
@@ -184,9 +202,8 @@ def build_server() -> FastMCP:
             )
         return profile
 
-    @mcp.tool()
+    @mcp.tool(description="Call a saved profile's base model with its saved persona." + USAGE_TIP)
     async def ask_profile(name: str, prompt: str) -> str:
-        """Call a saved profile's base model with its saved persona."""
         profile = _resolve_profile(name)
         if isinstance(profile, str):
             return profile
@@ -203,9 +220,11 @@ def build_server() -> FastMCP:
         except OpenRouterError as e:
             return f"orche: {e}"
 
-    @mcp.tool()
+    @mcp.tool(
+        description="Run a saved profile in agent mode against a workspace directory."
+        + USAGE_TIP
+    )
     async def agent_profile(name: str, prompt: str, workspace: str) -> str:
-        """Run a saved profile in agent mode against a workspace directory."""
         profile = _resolve_profile(name)
         if isinstance(profile, str):
             return profile

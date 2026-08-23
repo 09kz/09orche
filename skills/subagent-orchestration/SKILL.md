@@ -90,16 +90,48 @@ save_profile(
 )
 ```
 
+## When delegating is actually faster (and when it isn't)
+
+Four measured experiments in `examples/` — not speculation — settled this.
+Full detail and driver scripts are there; the short version:
+
+- **Solo won twice, ~2-3x, when the delegated pieces were small.** Free-tier
+  OpenRouter latency per call ranges roughly 8-110 seconds on the *same*
+  model and prompt — wildly variable, and dominated by queueing/network, not
+  by how much work the piece actually is. A handful of short README
+  summaries lost to solo Sonnet doing them directly, even dispatched in
+  parallel, because the round-trip overhead alone exceeded just doing the
+  work. **Don't delegate a piece of work small enough that you'd finish it
+  yourself before a free-tier call would even return.**
+- **Splitting an implementation from its own tests across independent
+  parallel calls produced 19 of 19 tests failing** — class names,
+  constructor signatures, and injected dependencies drifted apart between
+  the two calls despite matching, explicit prompts for both. There is no
+  shared source of truth between two isolated model calls; don't assume
+  matching instructions are enough.
+- **The one case that won decisively (~3.4x, fully verified, zero manual
+  fixes): two genuinely independent modules, each generated together with
+  its own tests in a single call, dispatched in parallel.** That's the
+  actual shape to aim for — substantial, self-contained, independent pieces,
+  not just "anything that can theoretically run in parallel."
+- `reasoning_effort` set explicitly (see the tool's own description) was the
+  difference between a call returning working code and a call burning its
+  entire budget on invisible chain-of-thought and returning nothing.
+
 ## A minimal end-to-end pattern
 
-1. Decompose the task into pieces that can be delegated independently, or
-   that build on each other through a shared `agent_*` workspace.
+1. Decompose the task into pieces that are each substantial and
+   self-contained — see above for why small or API-coupled pieces don't
+   parallelize well. Anything sharing an API surface (an implementation and
+   its own tests, two modules that call into each other) goes in one call,
+   not split across several.
 2. For each piece, decide: one-off (`ask_*`/`agent_*` with an inline
    `system_prompt`) or a saved profile (recurring role — check
    `list_profiles()` first).
-3. Delegate. If pieces depend on each other (subagent B needs to see what
-   subagent A produced), run them in a shared workspace and have B start by
-   reading A's output — don't assume B knows the API/shape without checking.
+3. Delegate. If pieces genuinely depend on each other (subagent B needs to
+   see what subagent A produced), run them in a shared workspace and have B
+   start by reading A's output — don't assume B knows the API/shape without
+   checking.
 4. Verify at the level the task warrants: read it yourself, run a mechanical
    check, or call a dedicated verifier profile — pick one, don't default to
    skipping this step because the subagent said it was done.
