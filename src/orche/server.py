@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
 from orche import cost
 from orche.agent import AgentError, run_agent
@@ -16,6 +16,16 @@ from orche.profiles import save_profile as _save_profile
 from orche.reasoning import VALID_EFFORTS
 
 DEFAULT_SYSTEM_PROMPT = "You are a helpful expert assistant."
+
+
+async def _log(ctx: "Context | None", message: str) -> None:
+    """Emit an MCP info log; silently no-ops when there is no live request context."""
+    if ctx is None:
+        return
+    try:
+        await ctx.info(message)
+    except Exception:
+        pass
 
 # Evidence-based, not speculative — see examples/README.md for the measured
 # timing experiments these two lines come from. Kept short deliberately:
@@ -74,8 +84,11 @@ def build_server() -> FastMCP:
             prompt: str,
             system_prompt: str = DEFAULT_SYSTEM_PROMPT,
             reasoning_effort: str | None = None,
+            ctx: Context = None,
         ) -> str:
             spec = catalogue[alias]
+            short_id = spec.id.split("/")[-1]
+            await _log(ctx,f"→ {alias} [{short_id}] thinking…")
             try:
                 return await ask(
                     api_key,
@@ -91,14 +104,20 @@ def build_server() -> FastMCP:
         return tool
 
     def make_agent_tool(alias: str, tier: str):
-        async def tool(prompt: str, workspace: str, reasoning_effort: str | None = None) -> str:
+        async def tool(
+            prompt: str,
+            workspace: str,
+            reasoning_effort: str | None = None,
+            ctx: Context = None,
+        ) -> str:
             spec = catalogue[alias]
             ws_path = Path(workspace).resolve()
             if not ws_path.is_dir():
                 return f"orche: workspace is not a directory: {workspace}"
             try:
                 return await run_agent(
-                    api_key, spec.id, tier, ws_path, prompt, spec.max_tokens, reasoning_effort
+                    api_key, spec.id, tier, ws_path, prompt, spec.max_tokens, reasoning_effort,
+                    ctx=ctx,
                 )
             except AgentError as e:
                 return f"orche: {e}"
@@ -203,11 +222,13 @@ def build_server() -> FastMCP:
         return profile
 
     @mcp.tool(description="Call a saved profile's base model with its saved persona." + USAGE_TIP)
-    async def ask_profile(name: str, prompt: str) -> str:
+    async def ask_profile(name: str, prompt: str, ctx: Context = None) -> str:
         profile = _resolve_profile(name)
         if isinstance(profile, str):
             return profile
         spec = catalogue[profile.base_alias]
+        short_id = spec.id.split("/")[-1]
+        await _log(ctx, f"→ {name} [{short_id}] thinking…")
         try:
             return await ask(
                 api_key,
@@ -224,7 +245,7 @@ def build_server() -> FastMCP:
         description="Run a saved profile in agent mode against a workspace directory."
         + USAGE_TIP
     )
-    async def agent_profile(name: str, prompt: str, workspace: str) -> str:
+    async def agent_profile(name: str, prompt: str, workspace: str, ctx: Context = None) -> str:
         profile = _resolve_profile(name)
         if isinstance(profile, str):
             return profile
@@ -249,6 +270,7 @@ def build_server() -> FastMCP:
                 spec.max_tokens,
                 profile.reasoning_effort,
                 profile.system_prompt,
+                ctx=ctx,
             )
         except AgentError as e:
             return f"orche: {e}"

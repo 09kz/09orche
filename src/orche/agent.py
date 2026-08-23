@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -15,6 +16,30 @@ from orche.tools import dispatch, schemas_for_tier
 
 BASE_URL = "https://openrouter.ai/api/v1"
 MAX_ITERATIONS = 15
+
+
+async def _log(ctx: Any, message: str) -> None:
+    """Emit an MCP info log; silently no-ops when there is no live request context."""
+    if ctx is None:
+        return
+    try:
+        await ctx.info(message)
+    except Exception:
+        pass
+
+
+def _args_preview(args_json: str, max_len: int = 60) -> str:
+    try:
+        args = json.loads(args_json)
+    except (json.JSONDecodeError, ValueError):
+        return "…"
+    parts = []
+    for k, v in args.items():
+        sv = str(v)
+        sv = sv[:27] + "…" if len(sv) > 30 else sv
+        parts.append(f"{k}={sv!r}")
+    result = ", ".join(parts)
+    return result[: max_len - 1] + "…" if len(result) > max_len else result
 
 AGENT_SYSTEM_PROMPT = """\
 You are a coding agent working inside a sandboxed workspace directory. You can \
@@ -36,6 +61,7 @@ async def run_agent(
     max_tokens: int | None = None,
     reasoning_effort: str | None = None,
     extra_system_prompt: str | None = None,
+    ctx: Any = None,
 ) -> str:
     try:
         reasoning = build_reasoning_param(reasoning_effort)
@@ -46,6 +72,7 @@ async def run_agent(
     if extra_system_prompt:
         system_prompt = f"{system_prompt}\n\n{extra_system_prompt}"
 
+    short_id = model_id.split("/")[-1]
     tools = schemas_for_tier(tier)
     messages: list[dict] = [
         {"role": "system", "content": system_prompt},
@@ -59,11 +86,13 @@ async def run_agent(
     }
 
     async with httpx.AsyncClient(timeout=get_timeout()) as client:
-        for _ in range(MAX_ITERATIONS):
+        for i in range(MAX_ITERATIONS):
             try:
                 cost.check_budget(model_id)
             except cost.BudgetExceededError as e:
                 raise AgentError(str(e)) from e
+
+            await _log(ctx, f"[{i + 1}/{MAX_ITERATIONS}] {short_id} thinking…")
 
             payload: dict = {"model": model_id, "messages": messages, "tools": tools}
             if max_tokens is not None:
@@ -91,6 +120,8 @@ async def run_agent(
             tool_calls = message.get("tool_calls")
 
             if not tool_calls:
+                word = "iteration" if i == 0 else "iterations"
+                await _log(ctx, f"done after {i + 1} {word}")
                 return message.get("content") or "(agent returned no content)"
 
             messages.append(message)
@@ -100,6 +131,8 @@ async def run_agent(
                     args = json.loads(fn.get("arguments") or "{}")
                 except json.JSONDecodeError:
                     args = {}
+                preview = _args_preview(fn.get("arguments") or "{}")
+                await _log(ctx, f"[{i + 1}/{MAX_ITERATIONS}] → {fn['name']}({preview})")
                 result = dispatch(workspace, tier, fn["name"], args)
                 messages.append(
                     {
